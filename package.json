@@ -45,17 +45,17 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@badeball/cypress-cucumber-preprocessor": ">=18 <24",
+    "@badeball/cypress-cucumber-preprocessor": ">=18 <25",
     "cypress": ">=12 <16",
-    "cypress-mochawesome-reporter": ">=3 <4",
-    "cypress-multi-reporters": ">=1 <2",
+    "cypress-mochawesome-reporter": ">=3 <5",
+    "cypress-multi-reporters": ">=1 <3",
     "cypress-parallel": ">=0.14 <1",
-    "junit-report-merger": ">=7 <9",
+    "junit-report-merger": ">=7 <10",
     "mocha-junit-reporter": ">=2 <3",
     "mochawesome": ">=7 <8",
     "mochawesome-merge": ">=4 <6",
     "mochawesome-report-generator": ">=6 <7",
-    "typescript": ">=5 <6"
+    "typescript": ">=5 <7"
   },
   "peerDependenciesMeta": {
     "@badeball/cypress-cucumber-preprocessor": {
