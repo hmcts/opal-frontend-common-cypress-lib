@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.tgz
+.DS_Store
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+functional-output/
+smoke-output/
+component-output/
+cucumber-report.html
+cucumber-report.json

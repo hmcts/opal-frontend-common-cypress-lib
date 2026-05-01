@@ -1,0 +1,123 @@
+name: Cypress Library CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [created]
+
+jobs:
+  ci:
+    name: Build and Test
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Enable Corepack
+        run: |
+          corepack enable
+          corepack prepare yarn@4.14.1 --activate
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Test
+        run: yarn test
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Build
+        run: yarn build
+
+      - name: Validate publish surface
+        run: yarn pack:check
+
+  release:
+    name: Release and Publish
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository (Release)
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name }}
+
+      - name: Validate release tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+
+          const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
+          const tag = process.env.RELEASE_TAG || '';
+          const normalizedTag = tag.startsWith('v') ? tag.slice(1) : tag;
+
+          if (normalizedTag !== pkg.version) {
+            console.error(`Release tag (${tag}) does not match package.json version (${pkg.version}).`);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Setup Node.js (Release)
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Enable Corepack (Release)
+        run: |
+          corepack enable
+          corepack prepare yarn@4.14.1 --activate
+
+      - name: Ensure npm version (Trusted Publishing)
+        run: |
+          npm --version
+          npm i -g npm@11.5.1
+          npm --version
+
+      - name: Install dependencies (Release)
+        run: yarn install --immutable
+
+      - name: Test (Release)
+        run: yarn test
+
+      - name: Typecheck (Release)
+        run: yarn typecheck
+
+      - name: Build (Release)
+        run: yarn build
+
+      - name: Validate publish surface (Release)
+        run: yarn pack:check
+
+      - name: Publish version (OIDC via npm)
+        run: |
+          # Ensure we do NOT publish using token-based auth (classic/granular).
+          unset NODE_AUTH_TOKEN
+
+          # Use a fresh npm user config with no auth token to force OIDC Trusted Publishing.
+          export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/npmrc-noauth"
+          printf "registry=https://registry.npmjs.org/\n" > "$NPM_CONFIG_USERCONFIG"
+
+          # Defensive: remove any auth token entries if something tries to inject them.
+          npm config delete //registry.npmjs.org/:_authToken || true
+          npm config delete _authToken || true
+
+          npm publish --access public
