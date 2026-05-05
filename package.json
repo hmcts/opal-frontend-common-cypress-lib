@@ -1,6 +1,6 @@
 {
   "name": "@hmcts/opal-frontend-common-cypress",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Shared Cypress runner, reporting, browser, and metadata tooling for OPAL frontend applications.",
   "license": "MIT",
   "repository": {

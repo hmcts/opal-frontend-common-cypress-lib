@@ -141,13 +141,13 @@ function loadCucumberHelpers(requireFromConsumer: NodeJS.Require): {
   createJsonFormatter: (messages: CucumberMessage[], onData: (chunk: string) => void) => JsonFormatter;
   mergeMessages: (messageCollections: CucumberMessage[][]) => CucumberMessage[];
 } {
-  const packageJsonPath = requireFromConsumer.resolve('@badeball/cypress-cucumber-preprocessor/package.json');
-  const packageRoot = path.dirname(packageJsonPath);
-  const { mergeMessages } = requireFromConsumer(path.join(packageRoot, 'dist/helpers/merge.js')) as {
+  const entrypointPath = requireFromConsumer.resolve('@badeball/cypress-cucumber-preprocessor');
+  const packageDist = path.dirname(entrypointPath);
+  const { mergeMessages } = requireFromConsumer(path.join(packageDist, 'helpers/merge.js')) as {
     mergeMessages: (messageCollections: CucumberMessage[][]) => CucumberMessage[];
   };
   const { createHtmlStream, createJsonFormatter } = requireFromConsumer(
-    path.join(packageRoot, 'dist/helpers/formatters.js'),
+    path.join(packageDist, 'helpers/formatters.js'),
   ) as {
     createHtmlStream: () => NodeJS.ReadWriteStream;
     createJsonFormatter: (messages: CucumberMessage[], onData: (chunk: string) => void) => JsonFormatter;
