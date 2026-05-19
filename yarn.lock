@@ -232,9 +232,13 @@ __metadata:
   bin:
     opal-cypress-build-component-report: ./dist/bin/build-component-report.js
     opal-cypress-build-cucumber-report: ./dist/bin/build-cucumber-report.js
+    opal-cypress-check-new-tests-jira-metadata: ./dist/bin/check-new-tests-jira-metadata.js
     opal-cypress-check-test-metadata: ./dist/bin/check-cypress-test-metadata.js
+    opal-cypress-extract-jira-test-keys: ./dist/bin/extract-jira-test-keys.js
+    opal-cypress-find-duplicate-scenarios: ./dist/bin/find-duplicate-scenarios.js
     opal-cypress-find-tests-missing-epic: ./dist/bin/find-tests-missing-epic.js
     opal-cypress-find-tests-with-multiple-epics: ./dist/bin/find-tests-with-multiple-epics.js
+    opal-cypress-find-unused-steps: ./dist/bin/find-unused-steps.js
     opal-cypress-resolve-placeholder-jira-epics: ./dist/bin/resolve-placeholder-jira-epics.js
     opal-cypress-runner: ./dist/bin/run-test-suite.js
   languageName: unknown

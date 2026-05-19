@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"path": "../../opal-frontend"
+		},
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"js/ts.tsserver.experimental.enableProjectDiagnostics": true,
+		"vitest.rootConfig": "vitest.config.mts",
+		"cucumberautocomplete.steps": [
+			"cypress/support/step_definitions/**/*.ts"
+		],
+		"cucumberautocomplete.syncfeatures": "cypress/e2e/**/*.feature",
+		"cucumberautocomplete.gherkinDefinitionPart": "(Given|When|Then|And|But)\\(",
+		"cucumberautocomplete.strictGherkinCompletion": true,
+		"cucumberautocomplete.smartSnippets": true,
+		"files.associations": {
+			"yarn-audit-known-issues": "plaintext"
+		}
+	}
+}

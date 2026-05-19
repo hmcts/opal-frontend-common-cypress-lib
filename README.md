@@ -21,7 +21,9 @@ This package centralises reusable Cypress infrastructure only:
 - Cypress runner CLI argument handling
 - report path resolution and report build commands
 - consumer-project binary resolution for Cypress/reporting peers
-- future Jira epic metadata checks and placeholder resolution
+- Jira metadata validation and placeholder resolution
+- Cucumber duplicate-scenario and unused-step analysis
+- Jira test-key extraction from Cypress specs and feature files
 
 It deliberately does not move application-specific Cypress specs, selectors, fixtures, intercepts, step definitions, Jenkinsfiles, or `cypress.config.ts`.
 
@@ -54,9 +56,13 @@ Consumers must keep their Cypress/reporting packages installed in the applicatio
 opal-cypress-runner
 opal-cypress-build-component-report
 opal-cypress-build-cucumber-report
+opal-cypress-check-new-tests-jira-metadata
 opal-cypress-check-test-metadata
+opal-cypress-extract-jira-test-keys
+opal-cypress-find-duplicate-scenarios
 opal-cypress-find-tests-missing-epic
 opal-cypress-find-tests-with-multiple-epics
+opal-cypress-find-unused-steps
 opal-cypress-resolve-placeholder-jira-epics
 ```
 
@@ -72,7 +78,11 @@ Keep the existing script names in `opal-frontend` and `opal-rm-frontend`; change
     "test:component": "opal-cypress-runner component --component --output-dir component-output",
     "build:component-report": "opal-cypress-build-component-report --suite component --output-dir component-output",
     "build:cucumber-report": "opal-cypress-build-cucumber-report --suite functional --output-dir functional-output",
-    "check:cypress-metadata": "opal-cypress-check-test-metadata"
+    "check:cypress-metadata": "opal-cypress-check-test-metadata",
+    "check:new-tests:jira-metadata": "opal-cypress-check-new-tests-jira-metadata --feature-root cypress/e2e/functional/opal/features --exclude-file cypress/e2e/functional/opal/features/reciprocalMaintenance/dummyTest.feature",
+    "find:duplicate:scenarios": "opal-cypress-find-duplicate-scenarios --root cypress/e2e/functional/opal/features",
+    "find:unused:steps": "opal-cypress-find-unused-steps --exclude-path-fragment manualAccountCreation --exclude-path-fragment manual-account-creation",
+    "extract:jira:test-keys": "opal-cypress-extract-jira-test-keys --output matches.csv"
   }
 }
 ```
@@ -105,7 +115,7 @@ To test local changes in a consumer repository:
    yarn pack:local
    ```
 
-   This creates a local `.tgz` artifact in this repository root, for example `hmcts-opal-frontend-common-cypress-0.0.1.tgz`.
+   This creates a local `.tgz` artifact in this repository root, for example `hmcts-opal-frontend-common-cypress-0.0.3.tgz`.
 
 2. In the consuming project, point an environment variable at this repository root:
 
