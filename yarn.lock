@@ -232,6 +232,7 @@ __metadata:
   bin:
     opal-cypress-build-component-report: ./dist/bin/build-component-report.js
     opal-cypress-build-cucumber-report: ./dist/bin/build-cucumber-report.js
+    opal-cypress-check-jira-test-metadata: ./dist/bin/check-cypress-test-metadata.js
     opal-cypress-check-new-tests-jira-metadata: ./dist/bin/check-new-tests-jira-metadata.js
     opal-cypress-check-test-metadata: ./dist/bin/check-cypress-test-metadata.js
     opal-cypress-extract-jira-test-keys: ./dist/bin/extract-jira-test-keys.js
