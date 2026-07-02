@@ -41,7 +41,7 @@ __metadata:
     typescript: "npm:^6.0.0"
     vitest: "npm:^4.0.0"
   peerDependencies:
-    "@badeball/cypress-cucumber-preprocessor": ">=18 <25"
+    "@badeball/cypress-cucumber-preprocessor": ">=18 <26"
     cypress: ">=12 <16"
     cypress-mochawesome-reporter: ">=3 <5"
     cypress-multi-reporters: ">=1 <3"
