@@ -48,7 +48,7 @@ __metadata:
     cypress-parallel: ">=0.14 <1"
     junit-report-merger: ">=7 <10"
     mocha-junit-reporter: ">=2 <3"
-    mochawesome: ">=7 <8"
+    mochawesome: ">=7 <9"
     mochawesome-merge: ">=4 <6"
     mochawesome-report-generator: ">=6 <7"
     typescript: ">=5 <7"
