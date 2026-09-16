@@ -50,7 +50,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@badeball/cypress-cucumber-preprocessor": ">=18 <27",
+    "@badeball/cypress-cucumber-preprocessor": ">=18 <29",
     "cypress": ">=12 <16",
     "cypress-mochawesome-reporter": ">=3 <6",
     "cypress-multi-reporters": ">=1 <3",
