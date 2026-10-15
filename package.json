@@ -60,7 +60,7 @@
     "mochawesome": ">=7 <9",
     "mochawesome-merge": ">=4 <6",
     "mochawesome-report-generator": ">=6 <7",
-    "typescript": ">=5 <7"
+    "typescript": ">=5 <8"
   },
   "peerDependenciesMeta": {
     "@badeball/cypress-cucumber-preprocessor": {
@@ -99,7 +99,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "typescript": "^6.0.0",
+    "typescript": "^7.0.0",
     "vitest": "^4.0.0"
   },
   "engines": {
