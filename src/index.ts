@@ -10,3 +10,4 @@ export * from './reports/report-paths';
 export * from './browser/browser-support';
 export * from './runner/opal-suite-runner';
 export * from './runner/runner-arguments';
+export { applyExtendedTestSelection } from './runner/extended-test-selection';

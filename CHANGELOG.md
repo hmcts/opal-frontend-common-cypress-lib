@@ -4,6 +4,12 @@ All notable changes to this package will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-10-26
+
+- Compose exclusions with resolved Cypress configuration through a runner-only marker and consumer setup helper.
+- Normalise selector aliases in CLI order, honour empty overrides, and rewrite both selector spellings consistently.
+- Export `applyExtendedTestSelection(config)` for consumer setup callbacks; direct Cypress runs continue to ignore the pipeline exclusion flag.
+
 ## [0.0.4] - 2026-10-26
 
 - Preserve nested JSON, arrays, and escaped quoted strings when merging Cypress options.

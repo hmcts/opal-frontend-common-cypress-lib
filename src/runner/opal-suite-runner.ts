@@ -4,7 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { normalizeBrowser, requireInstalledBrowser, resolveGenericBrowser } from '../browser/browser-support';
 import { resolvePackageBin } from '../utils/resolve-package-bin';
-import { applyExtendedTestSelection } from './extended-test-selection';
+import { prepareExtendedTestSelection } from './extended-test-selection';
 
 interface OpalRunnerOptions {
   browser: string;
@@ -169,7 +169,7 @@ function applyRunnerEnv(env: NodeJS.ProcessEnv, context: { mode: 'opal' | 'legac
 
   const tagExpression = String(env.CYPRESS_TAGS || env.TAGS || '').trim();
   if ((context.tags || tagExpression) && context.suite !== 'component') {
-    if (!env.CYPRESS_TAGS && env.TAGS) {
+    if (env.CYPRESS_TAGS === undefined && env.CYPRESS_tags === undefined && env.TAGS !== undefined) {
       env.CYPRESS_TAGS = env.TAGS;
     }
     env.CYPRESS_filterSpecs = env.CYPRESS_filterSpecs || 'true';
@@ -577,7 +577,7 @@ function runSerialSuite(
     commandArgs.push('--reporter-options', `mochaFile=${config.junitMochaFile}`);
   }
 
-  commandArgs.push(...applyExtendedTestSelection(config.suite, passthroughArgs, env));
+  commandArgs.push(...prepareExtendedTestSelection(config.suite, passthroughArgs, env));
 
   return runCommand(resolvePackageBin(cwd, 'cypress', 'cypress'), commandArgs, cwd, env, dryRun);
 }

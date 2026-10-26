@@ -1,9 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { runOpalSuite } from '../src/runner/opal-suite-runner';
+import { applyExtendedTestSelection } from '../src/runner/extended-test-selection';
 
-vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(() => ({ status: 0 })),
-}));
+vi.mock('node:child_process', () => ({ spawnSync: vi.fn(() => ({ status: 0 })) }));
 vi.mock('../src/browser/browser-support', () => ({
   normalizeBrowser: (browser: string) => browser,
   requireInstalledBrowser: (browser: string) => browser,
@@ -13,59 +12,41 @@ vi.mock('../src/utils/resolve-package-bin', () => ({
   resolvePackageBin: (_cwd: string, _package: string, bin: string) => bin,
 }));
 
+const marker = '__opalExcludeExtendedTests';
 const launch = (suite: string, env: NodeJS.ProcessEnv = {}, args: string[] = []) => {
   vi.mocked(spawnSync).mockClear();
   const original = { ...env };
   expect(runOpalSuite([suite, '--serial', '--no-reset', '--no-reports', ...args], '/consumer', env)).toBe(0);
   expect(env).toEqual(original);
   const call = vi.mocked(spawnSync).mock.calls.at(-1)!;
-  return {
-    args: call[1] as string[],
-    env: (call[2] as { env: NodeJS.ProcessEnv }).env,
-  };
+  return { args: call[1] as string[], env: (call[2] as { env: NodeJS.ProcessEnv }).env };
 };
+const values = (args: string[], flag: string): Record<string, unknown> => {
+  const index = args.indexOf(flag);
+  return index < 0 ? {} : JSON.parse(args[index + 1]!);
+};
+const resolved = (suite: string, env: Record<string, unknown> = {}, expose: Record<string, unknown> = {}) => ({
+  testingType: suite === 'functional' ? 'e2e' : 'component',
+  env,
+  expose,
+});
 
-const values = (args: string[], flag: string) => JSON.parse(args[args.indexOf(flag) + 1]!);
-
-describe('runner extended-test policy', () => {
-  it.each([undefined, 'false'])('keeps local, opted-in and nightly runs unchanged (%s)', (flag) => {
+describe('runner CLI selection preparation', () => {
+  it.each([undefined, 'false'])('leaves local, opted-in and nightly options unchanged (%s)', (flag) => {
     for (const suite of ['functional', 'component']) {
-      const result = launch(suite, {
-        EXCLUDE_EXTENDED_TESTS: flag,
-        TAGS: '@release',
-      });
-      expect(result.args).not.toContain('--env');
+      const result = launch(suite, { EXCLUDE_EXTENDED_TESTS: flag }, ['--env', 'keep=true']);
+      expect(result.args.slice(-2)).toEqual(['--env', 'keep=true']);
       expect(result.args).not.toContain('--expose');
-      expect(result.env.TAGS).toBe('@release');
     }
   });
 
-  it('combines functional OR, release and skip filters without mutating the parent environment', () => {
-    const result = launch('functional', {
-      EXCLUDE_EXTENDED_TESTS: 'true',
-      CYPRESS_TAGS: '(@R1A or @R1B) and not @skip',
-      TAGS: '@different',
-    });
-    expect(values(result.args, '--env').TAGS).toBe('((@R1A or @R1B) and not @skip) and not @extendedTest');
-    expect(result.env.CYPRESS_TAGS).toBe(result.env.TAGS);
+  it.each(['functional', 'component'])('marks %s launches without overriding configured selectors', (suite) => {
+    const result = launch(suite, { EXCLUDE_EXTENDED_TESTS: 'true' });
+    expect(values(result.args, '--env')).toEqual({ [marker]: true });
+    expect(result.args).not.toContain('--expose');
   });
 
-  it('respects CLI tag precedence and preserves unrelated options in key=value and JSON forms', () => {
-    const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true', TAGS: '@default' }, [
-      '--env=keep=true,TAGS=@extendedTest',
-      '--env',
-      '{"count":2,"nested":{"value":[1,2]}}',
-    ]);
-    expect(values(result.args, '--env')).toEqual({
-      keep: true,
-      count: 2,
-      nested: { value: [1, 2] },
-      TAGS: '(@extendedTest) and not @extendedTest',
-    });
-    expect(result.args.filter((arg) => arg === '--env')).toHaveLength(1);
-  });
-
-  it.each(['functional', 'component'])('preserves nested JSON and quoted %s option values', (suite) => {
+  it.each(['functional', 'component'])('preserves nested, quoted and dotted %s values', (suite) => {
     const flag = suite === 'functional' ? '--env' : '--expose';
     const selector = suite === 'functional' ? 'TAGS' : 'grepTags';
     const payload = {
@@ -82,148 +63,177 @@ describe('runner extended-test policy', () => {
       payload,
       message,
       items,
+      [selector]: '@release',
       'api.url': 'https://example.test',
-      ...(suite === 'functional'
-        ? { TAGS: '(@release) and not @extendedTest' }
-        : { grepTags: '@release --@extendedTest', grepOmitFiltered: true, grepFilterSpecs: false }),
+      ...(suite === 'functional' ? { [marker]: true } : {}),
     });
   });
 
-  it('preserves dotted functional option names alongside the tag selector', () => {
-    const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true' }, [
-      '--env',
-      'TAGS=@release,api.url=https://example.test,api.enabled=true',
-    ]);
-    expect(values(result.args, '--env')).toEqual({
-      TAGS: '(@release) and not @extendedTest',
-      'api.url': 'https://example.test',
-      'api.enabled': true,
+  it.each(['functional', 'component'])('honours later aliases, reverse aliases and empty %s overrides', (suite) => {
+    const flag = suite === 'functional' ? '--env' : '--expose';
+    const short = suite === 'functional' ? '-e' : '-x';
+    const canonical = suite === 'functional' ? 'TAGS' : 'grepTags';
+    const alias = suite === 'functional' ? 'tags' : 'grep-tags';
+    for (const [first, last] of [
+      [canonical, alias],
+      [alias, canonical],
+    ]) {
+      for (const selection of ['@release', '']) {
+        const result = launch(suite, { EXCLUDE_EXTENDED_TESTS: 'true' }, [
+          flag,
+          `${first}=@initial,keep=true`,
+          short,
+          `${last}=${selection},count=2`,
+        ]);
+        const selected = values(result.args, flag);
+        expect(selected[canonical]).toBe(selection);
+        expect(selected).not.toHaveProperty(alias!);
+        expect(selected.keep).toBe(true);
+        expect(selected.count).toBe(2);
+        expect(result.args).not.toContain(short);
+      }
+    }
+  });
+
+  it.each(['functional', 'component'])('supports equals-form short %s options', (suite) => {
+    const flag = suite === 'functional' ? '--env' : '--expose';
+    const short = suite === 'functional' ? '-e' : '-x';
+    const selector = suite === 'functional' ? 'TAGS' : 'grepTags';
+    const result = launch(suite, { EXCLUDE_EXTENDED_TESTS: 'true' }, [`${short}=${selector}=@release,keep=true`]);
+    expect(values(result.args, flag)[selector]).toBe('@release');
+    expect(values(result.args, flag).keep).toBe(true);
+    expect(result.args.some((arg) => arg.startsWith(`${short}=`))).toBe(false);
+  });
+
+  it('lets a component CLI alias override inherited canonical selectors, including empty selections', () => {
+    const inherited = launch('component', {
+      EXCLUDE_EXTENDED_TESTS: 'true',
+      CYPRESS_EXPOSE: '{"grepTags":"@initial","grep-tags":"@fallback"}',
     });
-  });
-
-  it('preserves dotted expose option names and comma-separated component tag selections', () => {
-    const result = launch('component', { EXCLUDE_EXTENDED_TESTS: 'true' }, [
-      '--expose',
-      'grepTags=@R1A,@R1B,api.url=https://example.test,api.enabled=true',
-    ]);
-    expect(values(result.args, '--expose')).toEqual({
-      grepTags: '@R1A,@R1B --@extendedTest',
-      'api.url': 'https://example.test',
-      'api.enabled': true,
-      grepOmitFiltered: true,
-      grepFilterSpecs: false,
-    });
-  });
-
-  it('excludes extended functional tests when no tag selection was supplied', () => {
-    expect(values(launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true' }).args, '--env').TAGS).toBe(
-      'not @extendedTest',
-    );
-  });
-
-  it('preserves component OR selections, aliases and unrelated expose values', () => {
-    const result = launch('component', { EXCLUDE_EXTENDED_TESTS: 'true', CYPRESS_EXPOSE: '{"keep":true}' }, [
-      '--expose',
-      'grep-tags=@R1A,@R1B,grepFilterSpecs=true',
-    ]);
-    expect(values(result.args, '--expose')).toEqual({
-      keep: true,
-      'grep-tags': '@R1A,@R1B',
-      grepTags: '@R1A,@R1B --@extendedTest',
-      grepOmitFiltered: true,
-      grepFilterSpecs: false,
-    });
-  });
-
-  it.each([
-    ['grep-tags', '@R1B'],
-    ['grepTags', '@R1B'],
-    ['grep-tags', ''],
-    ['grepTags', ''],
-  ])('gives CLI %s=%s precedence over inherited component selectors', (key, selection) => {
-    const result = launch(
-      'component',
-      {
-        EXCLUDE_EXTENDED_TESTS: 'true',
-        CYPRESS_EXPOSE: '{"grepTags":"@R1A","grep-tags":"@fallback","keep":true}',
-      },
-      ['--expose', `${key}=${selection}`],
-    );
-    const expose = values(result.args, '--expose');
-    expect(expose.grepTags).toBe(`${selection} --@extendedTest`.trim());
-    expect(expose.keep).toBe(true);
-  });
-
-  it.each([['-e', 'TAGS=@release,keep=true'], ['-e=TAGS=@release,keep=true']])(
-    'preserves short functional options %j',
-    (...args) => {
-      const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true', TAGS: '@default' }, args);
-      expect(values(result.args, '--env')).toEqual({ TAGS: '(@release) and not @extendedTest', keep: true });
-      expect(result.args).not.toContain('-e');
-      expect(result.args.some((arg) => arg.startsWith('-e='))).toBe(false);
-    },
-  );
-
-  it('merges mixed short and long functional options in CLI order', () => {
-    const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true' }, [
-      '--env',
-      'TAGS=@initial,keep=true',
-      '-e',
-      'TAGS=@release,count=2',
-    ]);
-    expect(values(result.args, '--env')).toEqual({ TAGS: '(@release) and not @extendedTest', keep: true, count: 2 });
-  });
-
-  it.each([['-x', 'grep-tags=@R1B,keep=true'], ['-x=grep-tags=@R1B,keep=true']])(
-    'preserves short component options %j',
-    (...args) => {
+    expect(values(inherited.args, '--expose')).toEqual({ grepTags: '@initial' });
+    for (const selection of ['@release', '']) {
       const result = launch(
         'component',
-        {
-          EXCLUDE_EXTENDED_TESTS: 'true',
-          CYPRESS_EXPOSE: '{"grepTags":"@R1A"}',
-        },
-        args,
+        { EXCLUDE_EXTENDED_TESTS: 'true', CYPRESS_EXPOSE: '{"grepTags":"@initial","keep":true}' },
+        ['--expose', `grep-tags=${selection}`],
       );
-      const expose = values(result.args, '--expose');
-      expect(expose.grepTags).toBe('@R1B --@extendedTest');
-      expect(expose.keep).toBe(true);
-      expect(result.args).not.toContain('-x');
-      expect(result.args.some((arg) => arg.startsWith('-x='))).toBe(false);
-    },
-  );
-
-  it('excludes extended components without requiring a consumer config hook', () => {
-    expect(values(launch('component', { EXCLUDE_EXTENDED_TESTS: 'true' }).args, '--expose')).toEqual({
-      grepTags: '--@extendedTest',
-      grepOmitFiltered: true,
-      grepFilterSpecs: false,
-    });
+      expect(values(result.args, '--expose')).toEqual({ grepTags: selection, keep: true });
+    }
   });
 
-  it('does not apply the functional/component exclusion to smoke tests', () => {
-    const result = launch('smoke', {
+  it('preserves explicit CLI and environment precedence, including empty environment overrides', () => {
+    const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true', CYPRESS_TAGS: '@env', TAGS: '@default' }, [
+      '--env',
+      'tags=@cli',
+    ]);
+    expect(values(result.args, '--env').TAGS).toBe('@cli');
+    const empty = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true', CYPRESS_TAGS: '', TAGS: '@default' });
+    expect(values(empty.args, '--env').TAGS).toBe('');
+    const lowercase = launch('functional', {
       EXCLUDE_EXTENDED_TESTS: 'true',
-      TAGS: '@smoke',
+      CYPRESS_tags: '@lower',
+      TAGS: '@default',
     });
-    expect(result.env.TAGS).toBe('@smoke');
-    expect(result.args).not.toContain('--env');
+    expect(values(lowercase.args, '--env').TAGS).toBe('@lower');
   });
 
-  it('passes the policy through parallel scheduling for the serial leaf runner to apply', () => {
+  it('preserves component OR tag commas and dotted option names', () => {
+    const result = launch('component', { EXCLUDE_EXTENDED_TESTS: 'true' }, [
+      '--expose',
+      'grep-tags=@R1A,@R1B,api.url=https://example.test',
+    ]);
+    expect(values(result.args, '--expose')).toEqual({ grepTags: '@R1A,@R1B', 'api.url': 'https://example.test' });
+  });
+
+  it('passes the unmodified selection and policy to parallel leaf runners', () => {
     vi.mocked(spawnSync).mockClear();
     expect(
       runOpalSuite(['functional', '--parallel', '--no-reset', '--no-reports'], '/consumer', {
         EXCLUDE_EXTENDED_TESTS: 'true',
-        TAGS: '@R1A',
+        TAGS: '@release',
       }),
     ).toBe(0);
     const call = vi.mocked(spawnSync).mock.calls.at(-1)!;
     expect(call[0]).toBe('cypress-parallel');
-    const childEnv = (call[2] as { env: NodeJS.ProcessEnv }).env;
-    expect(childEnv.EXCLUDE_EXTENDED_TESTS).toBe('true');
-    expect(childEnv.TAGS).toBe('@R1A');
-    const result = launch('functional', childEnv);
-    expect(values(result.args, '--env').TAGS).toBe('(@R1A) and not @extendedTest');
+    const env = (call[2] as { env: NodeJS.ProcessEnv }).env;
+    expect(env.EXCLUDE_EXTENDED_TESTS).toBe('true');
+    expect(env.TAGS).toBe('@release');
+    expect(values(launch('functional', env).args, '--env')).toEqual({ TAGS: '@release', [marker]: true });
   });
+
+  it('leaves smoke selection unchanged', () => {
+    const result = launch('smoke', { EXCLUDE_EXTENDED_TESTS: 'true', TAGS: '@smoke' });
+    expect(result.args).not.toContain('--env');
+    expect(result.env.TAGS).toBe('@smoke');
+  });
+});
+
+describe('resolved Cypress selection policy', () => {
+  it.each(['functional', 'component'])('preserves direct %s config despite the pipeline environment flag', (suite) => {
+    vi.stubEnv('EXCLUDE_EXTENDED_TESTS', 'true');
+    try {
+      const config = resolved(suite, { TAGS: '@release', tags: '@alias' }, { grepTags: '@release' });
+      const original = structuredClone(config);
+      applyExtendedTestSelection(config);
+      expect(config).toEqual(original);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('composes exclusion with configuration-defined functional tags and rewrites both aliases', () => {
+    const config = resolved('functional', { [marker]: true, TAGS: '(@R1A or @R1B) and not @skip', keep: true });
+    applyExtendedTestSelection(config);
+    expect(config.env).toEqual({
+      TAGS: '((@R1A or @R1B) and not @skip) and not @extendedTest',
+      tags: '((@R1A or @R1B) and not @skip) and not @extendedTest',
+      keep: true,
+    });
+    const applied = structuredClone(config);
+    applyExtendedTestSelection(config);
+    expect(config).toEqual(applied);
+  });
+
+  it('enforces exclusion for lowercase-only configured functional tags', () => {
+    const config = resolved('functional', { [marker]: true, tags: '@release' });
+    applyExtendedTestSelection(config);
+    expect(config.env.TAGS).toBe('(@release) and not @extendedTest');
+    expect(config.env.tags).toBe(config.env.TAGS);
+  });
+
+  it('composes exclusion with configured component OR selectors and rewrites both aliases', () => {
+    const config = resolved('component', { [marker]: true }, { grepTags: '@R1A+-@off @R1B', keep: true });
+    applyExtendedTestSelection(config);
+    expect(config.expose).toEqual({
+      grepTags: '@R1A+-@off @R1B --@extendedTest',
+      'grep-tags': '@R1A+-@off @R1B --@extendedTest',
+      keep: true,
+      grepOmitFiltered: true,
+      grepFilterSpecs: false,
+    });
+  });
+
+  it.each(['functional', 'component'])(
+    'keeps CLI overrides above configured %s selectors through composition',
+    (suite) => {
+      const flag = suite === 'functional' ? '--env' : '--expose';
+      const alias = suite === 'functional' ? 'tags' : 'grep-tags';
+      for (const selected of ['@cli', '']) {
+        const launched = launch(suite, { EXCLUDE_EXTENDED_TESTS: 'true' }, [flag, `${alias}=${selected}`]);
+        const config = resolved(
+          suite,
+          { TAGS: '@configured', tags: '@configuredAlias', ...values(launched.args, '--env') },
+          { grepTags: '@configured', 'grep-tags': '@configuredAlias', ...values(launched.args, '--expose') },
+        );
+        applyExtendedTestSelection(config);
+        if (suite === 'functional') {
+          expect(config.env.TAGS).toBe(selected ? `(${selected}) and not @extendedTest` : 'not @extendedTest');
+          expect(config.env.tags).toBe(config.env.TAGS);
+        } else {
+          expect(config.expose.grepTags).toBe(`${selected} --@extendedTest`.trim());
+          expect(config.expose['grep-tags']).toBe(config.expose.grepTags);
+        }
+      }
+    },
+  );
 });
