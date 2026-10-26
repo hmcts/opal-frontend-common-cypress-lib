@@ -4,6 +4,9 @@ All notable changes to this package will be documented in this file.
 
 ## [Unreleased]
 
+- Add runner-only `@extendedTest` exclusion for functional and component pipeline runs via `EXCLUDE_EXTENDED_TESTS=true`.
+- Preserve existing CLI tag selections and pass the policy through parallel leaf runners while leaving direct Cypress runs unchanged.
+
 ## [0.0.3] - 2026-05-19
 
 - Add `opal-cypress-check-jira-test-metadata` for Jira metadata policy validation.
