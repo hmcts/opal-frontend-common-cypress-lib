@@ -60,10 +60,16 @@ function parseValues(value: string): Record<string, unknown> {
   return values;
 }
 
+/** Canonicalise aliases within each occurrence so later CLI occurrences win, including empty strings. */
+function normaliseSelector(values: Record<string, unknown>, canonical: string, alias: string): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(values).map(([key, value]) => [key === alias ? canonical : key, value]));
+}
+
 function readOption(
   args: string[],
   option: string,
   alias: string,
+  selector?: [string, string],
 ): { args: string[]; values: Record<string, unknown> } {
   const remaining: string[] = [];
   let values: Record<string, unknown> = {};
@@ -73,7 +79,8 @@ function readOption(
     if (matchedOption !== undefined) {
       const value = arg === matchedOption ? args[++index] : arg.slice(matchedOption.length + 1);
       if (value === undefined) throw new Error(`Missing value for ${matchedOption}`);
-      values = { ...values, ...parseValues(value) };
+      const parsed = parseValues(value);
+      values = { ...values, ...(selector ? normaliseSelector(parsed, ...selector) : parsed) };
     } else {
       remaining.push(arg);
     }
@@ -81,36 +88,57 @@ function readOption(
   return { args: remaining, values };
 }
 
+const runnerMarker = '__opalExcludeExtendedTests';
+
+/** Pass a private CLI marker without replacing selectors that Cypress has yet to resolve. */
+export function prepareExtendedTestSelection(suite: string, args: string[], env: NodeJS.ProcessEnv): string[] {
+  if (env.EXCLUDE_EXTENDED_TESTS !== 'true' || !['component', 'functional'].includes(suite)) return args;
+
+  const option = readOption(args, '--env', '-e', ['TAGS', 'tags']);
+  if (suite === 'functional') {
+    const inherited = env.CYPRESS_TAGS ?? env.CYPRESS_tags ?? env.TAGS;
+    if (option.values.TAGS === undefined && inherited !== undefined) option.values.TAGS = inherited;
+    return [...option.args, '--env', JSON.stringify({ ...option.values, [runnerMarker]: true })];
+  }
+
+  const exposed = readOption(option.args, '--expose', '-x', ['grepTags', 'grep-tags']);
+  const inherited = parseValues(env.CYPRESS_EXPOSE || '');
+  const inheritedTags = inherited.grepTags ?? inherited['grep-tags'];
+  delete inherited['grep-tags'];
+  if (inheritedTags !== undefined) inherited.grepTags = inheritedTags;
+  const expose = { ...inherited, ...exposed.values };
+  const prepared = [...exposed.args, '--env', JSON.stringify({ ...option.values, [runnerMarker]: true })];
+  if (Object.keys(expose).length > 0) prepared.push('--expose', JSON.stringify(expose));
+  return prepared;
+}
+
+interface ExtendedTestConfig {
+  testingType: string;
+  env: Record<string, unknown>;
+  expose?: Record<string, unknown>;
+}
+
 /**
- * Apply the pipeline policy only to the Cypress child launched by the runner.
- * Direct Cypress runs never interpret EXCLUDE_EXTENDED_TESTS.
+ * Compose the policy with Cypress's resolved selectors before filtering plugins register.
+ * Only the runner's CLI marker enables it; direct Cypress runs ignore EXCLUDE_EXTENDED_TESTS.
  */
-export function applyExtendedTestSelection(suite: string, args: string[], env: NodeJS.ProcessEnv): string[] {
-  if (env.EXCLUDE_EXTENDED_TESTS !== 'true' || !['component', 'functional'].includes(suite)) {
-    return args;
-  }
+export function applyExtendedTestSelection<T extends ExtendedTestConfig>(config: T): T {
+  if (config.env[runnerMarker] !== true) return config;
+  delete config.env[runnerMarker];
 
-  if (suite === 'component') {
-    const option = readOption(args, '--expose', '-x');
-    const expose = {
-      ...parseValues(env.CYPRESS_EXPOSE || ''),
-      ...option.values,
-    };
-    const tags = String(
-      option.values.grepTags ?? option.values['grep-tags'] ?? expose.grepTags ?? expose['grep-tags'] ?? '',
-    ).trim();
-    // Double minus applies the exclusion to every OR branch, including inherited tags.
-    expose.grepTags = `${tags} --@extendedTest`.trim();
+  if (config.testingType === 'component') {
+    const expose = (config.expose ??= {});
+    const tags = String(expose.grepTags ?? expose['grep-tags'] ?? '').trim();
+    const expression = `${tags} --@extendedTest`.trim();
+    expose.grepTags = expression;
+    expose['grep-tags'] = expression;
     expose.grepOmitFiltered = true;
-    // Negative filters need browser evaluation, including dynamically built tags.
     expose.grepFilterSpecs = false;
-    return [...option.args, '--expose', JSON.stringify(expose)];
+  } else {
+    const tags = String(config.env.TAGS ?? config.env.tags ?? '').trim();
+    const expression = tags ? `(${tags}) and not @extendedTest` : 'not @extendedTest';
+    config.env.TAGS = expression;
+    config.env.tags = expression;
   }
-
-  const option = readOption(args, '--env', '-e');
-  const tags = String(option.values.TAGS ?? option.values.tags ?? env.CYPRESS_TAGS ?? env.TAGS ?? '').trim();
-  const expression = tags ? `(${tags}) and not @extendedTest` : 'not @extendedTest';
-  env.TAGS = expression;
-  env.CYPRESS_TAGS = expression;
-  return [...option.args, '--env', JSON.stringify({ ...option.values, TAGS: expression })];
+  return config;
 }

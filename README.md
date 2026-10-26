@@ -183,7 +183,7 @@ EXCLUDE_EXTENDED_TESTS=true opal-cypress-runner functional
 EXCLUDE_EXTENDED_TESTS=true opal-cypress-runner component
 ```
 
-The runner combines the exclusion with existing tag selections and passes it only to the Cypress child process.
+The runner passes a private CLI marker only to its Cypress child process. The library helper combines the exclusion with the resolved Cypress configuration, preserving configured, environment and CLI selectors.
 Parallel consumers must use runner-backed `test:functional:leaf` and `test:component:leaf` scripts, as OPAL does:
 
 ```json
@@ -214,7 +214,22 @@ selected tests; it does not select only extended tests.
 
 Direct `cypress open` and `cypress run` commands do not interpret `EXCLUDE_EXTENDED_TESTS`, so they include extended
 tests even if that variable is set. Explicit user tag selections and skipped tests still apply.
-No consumer `cypress.config.ts` hook is needed for this policy. Smoke-suite selection is unchanged.
+Register the library helper at the start of **both** E2E and component `setupNodeEvents` callbacks, before the
+Cucumber or grep plugins register:
+
+```ts
+import { applyExtendedTestSelection } from '@hmcts/opal-frontend-common-cypress';
+
+// Inside each setupNodeEvents(on, config) callback:
+applyExtendedTestSelection(config);
+// Register existing Cypress plugins, then return config as usual.
+```
+
+The helper acts only on the private runner marker, removes that marker, and otherwise leaves the config untouched.
+It does not read `EXCLUDE_EXTENDED_TESTS` from the environment. Direct Cypress commands therefore continue to
+include extended tests even when that pipeline flag is present. Smoke-suite selection is unchanged.
+Later CLI selector aliases, including empty values, override earlier occurrences. Both spellings of each resolved
+selector are rewritten together so an inherited alias cannot bypass the exclusion.
 
 ## Metadata Tags
 
