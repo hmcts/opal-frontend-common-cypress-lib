@@ -214,7 +214,7 @@ selected tests; it does not select only extended tests.
 
 Direct `cypress open` and `cypress run` commands do not interpret `EXCLUDE_EXTENDED_TESTS`, so they include extended
 tests even if that variable is set. Explicit user tag selections and skipped tests still apply.
-Register the library helper at the start of **both** E2E and component `setupNodeEvents` callbacks, before the
+For version **0.0.5 and later**, register the library helper at the start of **both** E2E and component `setupNodeEvents` callbacks, before the
 Cucumber or grep plugins register:
 
 ```ts
