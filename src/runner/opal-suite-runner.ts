@@ -4,6 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { normalizeBrowser, requireInstalledBrowser, resolveGenericBrowser } from '../browser/browser-support';
 import { resolvePackageBin } from '../utils/resolve-package-bin';
+import { applyExtendedTestSelection } from './extended-test-selection';
 
 interface OpalRunnerOptions {
   browser: string;
@@ -576,7 +577,7 @@ function runSerialSuite(
     commandArgs.push('--reporter-options', `mochaFile=${config.junitMochaFile}`);
   }
 
-  commandArgs.push(...passthroughArgs);
+  commandArgs.push(...applyExtendedTestSelection(config.suite, passthroughArgs, env));
 
   return runCommand(resolvePackageBin(cwd, 'cypress', 'cypress'), commandArgs, cwd, env, dryRun);
 }
