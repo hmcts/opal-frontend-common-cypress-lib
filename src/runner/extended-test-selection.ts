@@ -11,7 +11,7 @@ function parseValues(value: string): Record<string, unknown> {
 
   const values: Record<string, unknown> = {};
   // Commas inside a tag OR expression are part of the value, not option separators.
-  for (const entry of value.split(/,(?=[\w-]+=)/)) {
+  for (const entry of value.split(/,(?=[\w.-]+=)/)) {
     const equals = entry.indexOf('=');
     if (equals < 1) throw new Error(`Invalid Cypress selection option: ${entry}`);
     const raw = entry.slice(equals + 1);

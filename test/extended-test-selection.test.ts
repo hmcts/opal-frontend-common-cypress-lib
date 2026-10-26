@@ -65,6 +65,32 @@ describe('runner extended-test policy', () => {
     expect(result.args.filter((arg) => arg === '--env')).toHaveLength(1);
   });
 
+  it('preserves dotted functional option names alongside the tag selector', () => {
+    const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true' }, [
+      '--env',
+      'TAGS=@release,api.url=https://example.test,api.enabled=true',
+    ]);
+    expect(values(result.args, '--env')).toEqual({
+      TAGS: '(@release) and not @extendedTest',
+      'api.url': 'https://example.test',
+      'api.enabled': true,
+    });
+  });
+
+  it('preserves dotted expose option names and comma-separated component tag selections', () => {
+    const result = launch('component', { EXCLUDE_EXTENDED_TESTS: 'true' }, [
+      '--expose',
+      'grepTags=@R1A,@R1B,api.url=https://example.test,api.enabled=true',
+    ]);
+    expect(values(result.args, '--expose')).toEqual({
+      grepTags: '@R1A,@R1B --@extendedTest',
+      'api.url': 'https://example.test',
+      'api.enabled': true,
+      grepOmitFiltered: true,
+      grepFilterSpecs: false,
+    });
+  });
+
   it('excludes extended functional tests when no tag selection was supplied', () => {
     expect(values(launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true' }).args, '--env').TAGS).toBe(
       'not @extendedTest',
