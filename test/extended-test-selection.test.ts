@@ -65,6 +65,30 @@ describe('runner extended-test policy', () => {
     expect(result.args.filter((arg) => arg === '--env')).toHaveLength(1);
   });
 
+  it.each(['functional', 'component'])('preserves nested JSON and quoted %s option values', (suite) => {
+    const flag = suite === 'functional' ? '--env' : '--expose';
+    const selector = suite === 'functional' ? 'TAGS' : 'grepTags';
+    const payload = {
+      query: 'x,mode=test',
+      nested: [{ text: 'brackets } ],mode=keep', quote: 'a "quote",mode=keep', path: 'a\\b' }],
+    };
+    const message = 'quoted "text",mode=keep';
+    const items = ['x,mode=test', { value: 'x,api.url=keep' }];
+    const result = launch(suite, { EXCLUDE_EXTENDED_TESTS: 'true' }, [
+      flag,
+      `payload=${JSON.stringify(payload)},message=${JSON.stringify(message)},items=${JSON.stringify(items)},${selector}=@release,api.url=https://example.test`,
+    ]);
+    expect(values(result.args, flag)).toEqual({
+      payload,
+      message,
+      items,
+      'api.url': 'https://example.test',
+      ...(suite === 'functional'
+        ? { TAGS: '(@release) and not @extendedTest' }
+        : { grepTags: '@release --@extendedTest', grepOmitFiltered: true, grepFilterSpecs: false }),
+    });
+  });
+
   it('preserves dotted functional option names alongside the tag selector', () => {
     const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true' }, [
       '--env',

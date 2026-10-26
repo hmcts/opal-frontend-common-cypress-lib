@@ -6,6 +6,7 @@ All notable changes to this package will be documented in this file.
 
 ## [0.0.4] - 2026-10-26
 
+- Preserve nested JSON, arrays, and escaped quoted strings when merging Cypress options.
 - Preserve dotted Cypress option names alongside functional and component tag selections.
 - Honour CLI component tag aliases over inherited selectors and merge Cypress `-e` / `-x` short options without dropping other values.
 - Add runner-only `@extendedTest` exclusion for functional and component pipeline runs via `EXCLUDE_EXTENDED_TESTS=true`.

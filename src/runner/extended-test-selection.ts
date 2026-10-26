@@ -1,3 +1,40 @@
+/** Split only top-level option boundaries, preserving JSON, quoted values and tag OR commas. */
+function splitOptions(value: string): string[] {
+  const entries: string[] = [];
+  let start = 0;
+  let valueStart = value.indexOf('=') + 1;
+  let depth = 0;
+  let quote: string | undefined;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (quote !== undefined) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = undefined;
+      continue;
+    }
+
+    // Quotes and brackets within ordinary unquoted text are literal characters.
+    const beginsValue = index >= valueStart && value.slice(valueStart, index).trim() === '';
+    if ((char === '"' || char === "'") && (depth > 0 || beginsValue)) {
+      quote = char;
+    } else if ((char === '{' || char === '[') && (depth > 0 || beginsValue)) {
+      depth += 1;
+    } else if ((char === '}' || char === ']') && depth > 0) {
+      depth -= 1;
+    } else if (char === ',' && depth === 0 && /^[\w.-]+=/.test(value.slice(index + 1))) {
+      entries.push(value.slice(start, index));
+      start = index + 1;
+      valueStart = value.indexOf('=', start) + 1;
+    }
+  }
+
+  entries.push(value.slice(start));
+  return entries;
+}
+
 /** Parse the JSON or key=value form accepted by Cypress --env and --expose. */
 function parseValues(value: string): Record<string, unknown> {
   if (!value.trim()) return {};
@@ -10,8 +47,7 @@ function parseValues(value: string): Record<string, unknown> {
   }
 
   const values: Record<string, unknown> = {};
-  // Commas inside a tag OR expression are part of the value, not option separators.
-  for (const entry of value.split(/,(?=[\w.-]+=)/)) {
+  for (const entry of splitOptions(value)) {
     const equals = entry.indexOf('=');
     if (equals < 1) throw new Error(`Invalid Cypress selection option: ${entry}`);
     const raw = entry.slice(equals + 1);
