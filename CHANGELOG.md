@@ -4,6 +4,8 @@ All notable changes to this package will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-10-26
+
 - Add runner-only `@extendedTest` exclusion for functional and component pipeline runs via `EXCLUDE_EXTENDED_TESTS=true`.
 - Preserve existing CLI tag selections and pass the policy through parallel leaf runners while leaving direct Cypress runs unchanged.
 
