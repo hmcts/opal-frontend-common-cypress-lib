@@ -195,7 +195,8 @@ Parallel consumers must use runner-backed `test:functional:leaf` and `test:compo
 
 Component exclusion requires a Cypress version supporting `--expose` and `@cypress/grep` v6 registration in the consumer support file.
 Functional selection uses the Cucumber preprocessor's `TAGS` environment option.
-CLI options accept both JSON objects and comma-separated `key=value` values.
+CLI options accept both JSON objects and comma-separated `key=value` values. Both `--env` / `-e` and `--expose` / `-x` are supported.
+Explicit CLI `grepTags` or `grep-tags` values take precedence over inherited component selectors, including an empty selection.
 Set `EXCLUDE_EXTENDED_TESTS=false` (or leave it unset) for manual and nightly runs that should include extended tests.
 Consumer Jenkinsfiles own PR-label decisions such as `extendedTests`; this library does not query GitHub.
 For the OPAL frontend, use the following policy:

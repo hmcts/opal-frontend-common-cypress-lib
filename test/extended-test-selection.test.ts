@@ -85,6 +85,64 @@ describe('runner extended-test policy', () => {
     });
   });
 
+  it.each([
+    ['grep-tags', '@R1B'],
+    ['grepTags', '@R1B'],
+    ['grep-tags', ''],
+    ['grepTags', ''],
+  ])('gives CLI %s=%s precedence over inherited component selectors', (key, selection) => {
+    const result = launch(
+      'component',
+      {
+        EXCLUDE_EXTENDED_TESTS: 'true',
+        CYPRESS_EXPOSE: '{"grepTags":"@R1A","grep-tags":"@fallback","keep":true}',
+      },
+      ['--expose', `${key}=${selection}`],
+    );
+    const expose = values(result.args, '--expose');
+    expect(expose.grepTags).toBe(`${selection} --@extendedTest`.trim());
+    expect(expose.keep).toBe(true);
+  });
+
+  it.each([['-e', 'TAGS=@release,keep=true'], ['-e=TAGS=@release,keep=true']])(
+    'preserves short functional options %j',
+    (...args) => {
+      const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true', TAGS: '@default' }, args);
+      expect(values(result.args, '--env')).toEqual({ TAGS: '(@release) and not @extendedTest', keep: true });
+      expect(result.args).not.toContain('-e');
+      expect(result.args.some((arg) => arg.startsWith('-e='))).toBe(false);
+    },
+  );
+
+  it('merges mixed short and long functional options in CLI order', () => {
+    const result = launch('functional', { EXCLUDE_EXTENDED_TESTS: 'true' }, [
+      '--env',
+      'TAGS=@initial,keep=true',
+      '-e',
+      'TAGS=@release,count=2',
+    ]);
+    expect(values(result.args, '--env')).toEqual({ TAGS: '(@release) and not @extendedTest', keep: true, count: 2 });
+  });
+
+  it.each([['-x', 'grep-tags=@R1B,keep=true'], ['-x=grep-tags=@R1B,keep=true']])(
+    'preserves short component options %j',
+    (...args) => {
+      const result = launch(
+        'component',
+        {
+          EXCLUDE_EXTENDED_TESTS: 'true',
+          CYPRESS_EXPOSE: '{"grepTags":"@R1A"}',
+        },
+        args,
+      );
+      const expose = values(result.args, '--expose');
+      expect(expose.grepTags).toBe('@R1B --@extendedTest');
+      expect(expose.keep).toBe(true);
+      expect(result.args).not.toContain('-x');
+      expect(result.args.some((arg) => arg.startsWith('-x='))).toBe(false);
+    },
+  );
+
   it('excludes extended components without requiring a consumer config hook', () => {
     expect(values(launch('component', { EXCLUDE_EXTENDED_TESTS: 'true' }).args, '--expose')).toEqual({
       grepTags: '--@extendedTest',

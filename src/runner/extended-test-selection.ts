@@ -24,14 +24,19 @@ function parseValues(value: string): Record<string, unknown> {
   return values;
 }
 
-function readOption(args: string[], option: string): { args: string[]; values: Record<string, unknown> } {
+function readOption(
+  args: string[],
+  option: string,
+  alias: string,
+): { args: string[]; values: Record<string, unknown> } {
   const remaining: string[] = [];
   let values: Record<string, unknown> = {};
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index] as string;
-    if (arg === option || arg.startsWith(`${option}=`)) {
-      const value = arg === option ? args[++index] : arg.slice(option.length + 1);
-      if (value === undefined) throw new Error(`Missing value for ${option}`);
+    const matchedOption = [option, alias].find((name) => arg === name || arg.startsWith(`${name}=`));
+    if (matchedOption !== undefined) {
+      const value = arg === matchedOption ? args[++index] : arg.slice(matchedOption.length + 1);
+      if (value === undefined) throw new Error(`Missing value for ${matchedOption}`);
       values = { ...values, ...parseValues(value) };
     } else {
       remaining.push(arg);
@@ -50,12 +55,14 @@ export function applyExtendedTestSelection(suite: string, args: string[], env: N
   }
 
   if (suite === 'component') {
-    const option = readOption(args, '--expose');
+    const option = readOption(args, '--expose', '-x');
     const expose = {
       ...parseValues(env.CYPRESS_EXPOSE || ''),
       ...option.values,
     };
-    const tags = String(expose.grepTags || expose['grep-tags'] || '').trim();
+    const tags = String(
+      option.values.grepTags ?? option.values['grep-tags'] ?? expose.grepTags ?? expose['grep-tags'] ?? '',
+    ).trim();
     // Double minus applies the exclusion to every OR branch, including inherited tags.
     expose.grepTags = `${tags} --@extendedTest`.trim();
     expose.grepOmitFiltered = true;
@@ -64,7 +71,7 @@ export function applyExtendedTestSelection(suite: string, args: string[], env: N
     return [...option.args, '--expose', JSON.stringify(expose)];
   }
 
-  const option = readOption(args, '--env');
+  const option = readOption(args, '--env', '-e');
   const tags = String(option.values.TAGS ?? option.values.tags ?? env.CYPRESS_TAGS ?? env.TAGS ?? '').trim();
   const expression = tags ? `(${tags}) and not @extendedTest` : 'not @extendedTest';
   env.TAGS = expression;
