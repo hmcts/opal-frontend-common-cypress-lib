@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const expectedFiles = [
   'dist/bin/run-test-suite.js',
+  'dist/runner/extended-test-selection.js',
   'dist/bin/build-component-report.js',
   'dist/bin/build-cucumber-report.js',
   'dist/bin/check-cypress-test-metadata.js',

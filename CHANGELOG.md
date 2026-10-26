@@ -4,6 +4,14 @@ All notable changes to this package will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-10-26
+
+- Preserve nested JSON, arrays, and escaped quoted strings when merging Cypress options.
+- Preserve dotted Cypress option names alongside functional and component tag selections.
+- Honour CLI component tag aliases over inherited selectors and merge Cypress `-e` / `-x` short options without dropping other values.
+- Add runner-only `@extendedTest` exclusion for functional and component pipeline runs via `EXCLUDE_EXTENDED_TESTS=true`.
+- Preserve existing CLI tag selections and pass the policy through parallel leaf runners while leaving direct Cypress runs unchanged.
+
 ## [0.0.3] - 2026-05-19
 
 - Add `opal-cypress-check-jira-test-metadata` for Jira metadata policy validation.

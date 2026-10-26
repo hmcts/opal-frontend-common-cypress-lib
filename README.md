@@ -159,6 +159,63 @@ Parallel mode delegates to the consumer repository's `cypress-parallel` install:
 opal-cypress-runner functional --parallel --threads 4 --script cypress:run --specs-dir cypress/e2e
 ```
 
+## Extended tests
+
+Mark functional scenarios and component tests with `@extendedTest`, keeping existing Jira and release tags.
+A feature-level tag or component `describe` tag applies to its nested tests.
+
+```gherkin
+@extendedTest
+Scenario: An extended journey
+  # Existing steps
+```
+
+```ts
+it('checks an extended case', { tags: [...existingTags, '@extendedTest'] }, () => {
+  // Existing assertions
+});
+```
+
+The runner includes extended tests by default. Set `EXCLUDE_EXTENDED_TESTS=true` to exclude them from functional and component runs:
+
+```sh
+EXCLUDE_EXTENDED_TESTS=true opal-cypress-runner functional
+EXCLUDE_EXTENDED_TESTS=true opal-cypress-runner component
+```
+
+The runner combines the exclusion with existing tag selections and passes it only to the Cypress child process.
+Parallel consumers must use runner-backed `test:functional:leaf` and `test:component:leaf` scripts, as OPAL does:
+
+```json
+{
+  "test:functional:leaf": "opal-cypress-runner functional --serial --no-reports --no-reset",
+  "test:component:leaf": "opal-cypress-runner component --serial --no-reports --no-reset"
+}
+```
+
+Component exclusion requires a Cypress version supporting `--expose` and `@cypress/grep` v6 registration in the consumer support file.
+Functional selection uses the Cucumber preprocessor's `TAGS` environment option.
+CLI options accept both JSON objects and comma-separated `key=value` values. Both `--env` / `-e` and `--expose` / `-x` are supported.
+Explicit CLI `grepTags` or `grep-tags` values take precedence over inherited component selectors, including an empty selection.
+Set `EXCLUDE_EXTENDED_TESTS=false` (or leave it unset) for manual and nightly runs that should include extended tests.
+Consumer Jenkinsfiles own PR-label decisions such as `extendedTests`; this library does not query GitHub.
+For the OPAL frontend, use the following policy:
+
+| Execution | `EXCLUDE_EXTENDED_TESTS` | Extended tests |
+| --- | --- | --- |
+| PR without `extendedTests` | `true` | Excluded |
+| PR with `extendedTests` | `false` | Included in the selected suite |
+| Master pipeline | `true` | Excluded |
+| Scheduled or manually triggered nightly | `false` | Included in the selected suite |
+| Local runner | Unset | Included in the selected suite |
+
+Existing release, tag, folder, and skip selectors still apply. The label includes extended tests alongside ordinary
+selected tests; it does not select only extended tests.
+
+Direct `cypress open` and `cypress run` commands do not interpret `EXCLUDE_EXTENDED_TESTS`, so they include extended
+tests even if that variable is set. Explicit user tag selections and skipped tests still apply.
+No consumer `cypress.config.ts` hook is needed for this policy. Smoke-suite selection is unchanged.
+
 ## Metadata Tags
 
 Metadata checks support Jira epic tags in feature files and Cypress specs:
